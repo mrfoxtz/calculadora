@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Simulador de Obra</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+
+    h1 {
+      text-align: center;
+    }
+
+    input, select {
+      padding: 5px;
+      width: 100%;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+
+    .resultado, .tabela {
+      border: 1px solid #ccc;
+      padding: 10px;
+      margin-top: 20px;
+    }
+
+    .highlight {
+      font-weight: bold;
+      padding: 10px;
+      margin-top: 10px;
+    }
+
+    .bg-verde { background-color: #ccffcc; }
+    .bg-amarelo { background-color: #fff2cc; }
+    .bg-vermelho { background-color: #ffcccc; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+
+    table th, table td {
+      border: 1px solid #ccc;
+      padding: 6px;
+      text-align: center;
+    }
+
+    button {
+      padding: 10px 20px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+<h1>Simulador de Obra</h1>
+
+<div class="grid">
+  <div>
+    <label>Custo por m²</label>
+    <input type="number" id="custo_m2" step="0.01">
+  </div>
+  <div>
+    <label>Lucro Esperado (%)</label>
+    <input type="number" id="lucro_esperado">
+  </div>
+  <div>
+    <label>% Imposto</label>
+    <input type="number" id="imposto">
+  </div>
+  <div>
+    <label>% Comissão</label>
+    <input type="number" id="comissao">
+  </div>
+  <div>
+    <label>Valor da Permuta / Comissão</label>
+    <input type="number" id="valor_permuta_extra" step="0.01">
+  </div>
+</div>
+
+<div class="tabela">
+  <h3>Unidades</h3>
+  <table id="tabela-unidades">
+    <thead>
+      <tr>
+        <th>Proprietário</th>
+        <th>Metragem</th>
+        <th>Quantidade</th>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- Criamos 5 linhas por padrão -->
+      <script>
+        for (let i = 0; i < 5; i++) {
+          document.write(`
+            <tr>
+              <td>
+                <select>
+                  <option value="Construtora">Construtora</option>
+                  <option value="Permuta">Permuta</option>
+                </select>
+              </td>
+              <td><input type="number" step="0.01"></td>
+              <td><input type="number"></td>
+            </tr>
+          `);
+        }
+      </script>
+    </tbody>
+  </table>
+</div>
+
+<div style="text-align:center;">
+  <button onclick="calcular()">Calcular</button>
+</div>
+
+<div class="resultado">
+  <div id="valor_m2"></div>
+  <div id="custo_total"></div>
+  <div id="vgv_total"></div>
+  <div id="lucro_liquido" class="highlight"></div>
+  <div id="roi" class="highlight"></div>
+</div>
+
+<div class="resultado">
+  <h3>Sugestão de valores por unidade</h3>
+  <table id="tabela-sugestoes">
+    <thead>
+      <tr>
+        <th>Proprietário</th>
+        <th>Metragem</th>
+        <th>Qtd</th>
+        <th>Sugestão R$</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<script>
+function calcular() {
+  const custo_m2 = parseFloat(document.getElementById("custo_m2").value || 0);
+  const lucro = parseFloat(document.getElementById("lucro_esperado").value || 0) / 100;
+  const imposto = parseFloat(document.getElementById("imposto").value || 0) / 100;
+  const comissao = parseFloat(document.getElementById("comissao").value || 0) / 100;
+  const valor_permuta_extra = parseFloat(document.getElementById("valor_permuta_extra").value || 0);
+
+  let total_geral = 0;
+  let total_permuta = 0;
+  let linhas = document.querySelectorAll("#tabela-unidades tbody tr");
+  let sugestoes = "";
+  let unidades_construtora = [];
+
+  linhas.forEach(linha => {
+    const tipo = linha.cells[0].querySelector("select").value;
+    const metragem = parseFloat(linha.cells[1].querySelector("input").value || 0);
+    const qtd = parseInt(linha.cells[2].querySelector("input").value || 0);
+    const total = metragem * qtd;
+
+    total_geral += total;
+    if (tipo === "Permuta") total_permuta += total;
+    if (tipo === "Construtora") unidades_construtora.push({ metragem, qtd });
+  });
+
+  const metragem_liquida = total_geral - total_permuta || 1;
+
+  const custo_construcao = metragem_liquida * custo_m2;
+  const custo_permuta = total_permuta * custo_m2 + valor_permuta_extra;
+  const custo_total = custo_construcao + custo_permuta;
+
+  const vgv = (custo_total * (1 + lucro)) / (1 - (imposto + comissao));
+  const lucro_liquido = vgv - custo_total;
+  const roi = custo_total > 0 ? (lucro_liquido / custo_total) : 0;
+  const valor_m2 = vgv / metragem_liquida;
+
+  document.getElementById("valor_m2").innerText = `Valor por m²: R$ ${valor_m2.toFixed(2)}`;
+  document.getElementById("custo_total").innerText = `Custo Geral da Obra: R$ ${custo_total.toFixed(2)}`;
+  document.getElementById("vgv_total").innerText = `VGV Geral da Obra: R$ ${vgv.toFixed(2)}`;
+
+  const roiBox = document.getElementById("roi");
+  const lucroBox = document.getElementById("lucro_liquido");
+
+  roiBox.innerText = `ROI: ${(roi * 100).toFixed(2)}%`;
+  lucroBox.innerText = `Lucro Líquido: R$ ${lucro_liquido.toFixed(2)}`;
+
+  roiBox.className = lucroBox.className = "highlight " +
+    (roi < 0.15 ? "bg-vermelho" : roi <= 0.30 ? "bg-amarelo" : "bg-verde");
+
+  const corpo = document.querySelector("#tabela-sugestoes tbody");
+  corpo.innerHTML = "";
+  linhas.forEach(linha => {
+    const tipo = linha.cells[0].querySelector("select").value;
+    const metragem = parseFloat(linha.cells[1].querySelector("input").value || 0);
+    const qtd = parseInt(linha.cells[2].querySelector("input").value || 0);
+    const sugestao = valor_m2 * metragem;
+    if (qtd > 0) {
+      corpo.innerHTML += `
+        <tr>
+          <td>${tipo}</td>
+          <td>${metragem.toFixed(2)}</td>
+          <td>${qtd}</td>
+          <td>R$ ${sugestao.toFixed(2)}</td>
+        </tr>
+      `;
+    }
+  });
+}
+</script>
+
+</body>
+</html>
